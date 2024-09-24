@@ -2,6 +2,17 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk  # 引入 Pillow 库
 import pandas as pd
+import numpy as np
+import keras
+from datetime import datetime
+
+# 定义并注册自定义函数
+@keras.saving.register_keras_serializable()
+def mse(y_true, y_pred):
+    return keras.losses.mean_squared_error(y_true, y_pred)
+
+# 加载保存的模型
+model = keras.models.load_model('model.h5', custom_objects={'mse': mse})
 
 # 读取 CSV 文件
 df = pd.read_csv('data/customer_power_data.csv', parse_dates=['timestamp'])
@@ -13,6 +24,9 @@ df['day'] = df['timestamp'].dt.day
 
 # 获取唯一的年、月、日列表
 years = sorted(df['year'].unique())
+current_year = datetime.now().year
+years = list(range(min(years), current_year + 1))
+
 months = list(range(1, 13))
 days = list(range(1, 32))
 
@@ -28,11 +42,11 @@ root.resizable(False, False)
 root.attributes("-toolwindow", True)
 
 # 创建年份选择框
-year_var = tk.StringVar(value=str(years[-1]))
+year_var = tk.StringVar(value=str([0]))
 ttk.Label(root, text="年:").grid(row=0, column=0, padx=5, pady=5)
 year_combobox = ttk.Combobox(root, textvariable=year_var, values=[str(year) for year in years])
 year_combobox.grid(row=0, column=1, padx=5, pady=5)
-year_combobox.current(len(years) - 1)  # 默认选择最新年份
+year_combobox.current(0)  # 默认选择最老的年份
 
 # 创建月份选择框
 month_var = tk.StringVar(value="1")
@@ -141,6 +155,18 @@ for data_item, (x, y) in data_positions.items():
     label.place(x=x, y=y)
     data_labels[data_item] = label
 
+# 定义递归预测函数
+def recursive_predict(model, input_data, steps):
+    if steps == 0:
+        return []
+    
+    prediction = model.predict(input_data)
+    predictions = [prediction]
+    next_input_data = np.expand_dims(prediction, axis=0)
+    predictions += recursive_predict(model, next_input_data, steps - 1)
+    
+    return predictions
+
 # 更新时间显示的函数
 def update_time_display():
     time_value = time_var.get()
@@ -164,10 +190,13 @@ def update_data_display():
     try:
         selected_time = pd.Timestamp(year, month, day, hour, minute)
     except ValueError:
-        # 处理无效日期，例如2月30日
+        # Handle invalid date
         for label in data_labels.values():
-            label.config(text="无效日期")
+            label.config(text="N/A")
         return
+    
+    # 获取 df 中的最后一条记录的 timestamp
+    last_timestamp = df['timestamp'].max()
     
     # 查找对应时间的数据
     if selected_time in df['timestamp'].values:
@@ -176,9 +205,31 @@ def update_data_display():
             value = row[column].values[0]
             formatted_value = f"{value:.2f}"  # 保留两位小数
             data_labels[f'data{i+1}'].config(text=formatted_value)
+    elif selected_time > last_timestamp:
+        # 获取最新的输入数据
+        latest_data = df.iloc[-1, 1:32].values.astype(np.float32)  # 获取最后一行数据，去掉时间戳列，并转换为 float32
+        
+        # 构建输入数据，形状为 (1, 1, 31)
+        input_data = np.expand_dims(np.expand_dims(latest_data, axis=0), axis=0)
+
+        # 计算时间步数
+        time_diff = selected_time - last_timestamp
+        steps = int(time_diff.total_seconds() // 1800)  # 每30分钟一个时间步
+        
+        # 预测未来2个时间步的数据
+        predictions = recursive_predict(model, input_data, steps)
+
+        # 获取最新的预测结果
+        latest_prediction = predictions[-1][0]  # 获取最后一个预测结果，并去掉外层的列表
+        
+        # 将最新的预测结果展示到界面上
+        for i, value in enumerate(latest_prediction):
+            formatted_value = f"{value:.2f}"  # 保留两位小数
+            data_labels[f'data{i+1}'].config(text=formatted_value)
+        
     else:
         for label in data_labels.values():
-            label.config(text="所选时间没有数据")
+            label.config(text="N/A")
 
 # 绑定更新数据显示的事件
 year_combobox.bind("<<ComboboxSelected>>", lambda e: update_data_display())
