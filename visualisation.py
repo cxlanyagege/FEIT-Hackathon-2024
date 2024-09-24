@@ -157,14 +157,12 @@ for data_item, (x, y) in data_positions.items():
 
 # 定义递归预测函数
 def recursive_predict(model, input_data, steps):
-    if steps == 0:
-        return []
-    
-    prediction = model.predict(input_data)
-    predictions = [prediction]
-    next_input_data = np.expand_dims(prediction, axis=0)
-    predictions += recursive_predict(model, next_input_data, steps - 1)
-    
+    predictions = []
+    for _ in range(steps):
+        prediction = model.predict(input_data)
+        prediction = np.expand_dims(prediction, axis=1)  # 将 prediction 扩展为 3 维数组
+        input_data = np.append(input_data[:, 1:, :], prediction, axis=1)
+        predictions.append(prediction)  # 将预测结果添加到 predictions 列表中
     return predictions
 
 # 更新时间显示的函数
@@ -207,26 +205,36 @@ def update_data_display():
             data_labels[f'data{i+1}'].config(text=formatted_value)
     elif selected_time > last_timestamp:
         # 获取最新的输入数据
-        latest_data = df.iloc[-1, 1:32].values.astype(np.float32)  # 获取最后一行数据，去掉时间戳列，并转换为 float32
+        latest_data = df.iloc[-48:, 1:32].values.astype(np.float32)  # 获取最后48行数据，去掉时间戳列，并转换为 float32
         
-        # 构建输入数据，形状为 (1, 1, 31)
-        input_data = np.expand_dims(np.expand_dims(latest_data, axis=0), axis=0)
+        # 如果数据不足48行，用零填充
+        if latest_data.shape[0] < 48:
+            padding = np.zeros((48 - latest_data.shape[0], latest_data.shape[1]), dtype=np.float32)
+            latest_data = np.vstack((padding, latest_data))
+        
+        # 构建输入数据，形状为 (1, 48, 31)
+        input_data = np.expand_dims(latest_data, axis=0)
 
         # 计算时间步数
         time_diff = selected_time - last_timestamp
         steps = int(time_diff.total_seconds() // 1800)  # 每30分钟一个时间步
         
-        # 预测未来2个时间步的数据
+        # 预测未来的时间步数据
         predictions = recursive_predict(model, input_data, steps)
-
-        # 获取最新的预测结果
-        latest_prediction = predictions[-1][0]  # 获取最后一个预测结果，并去掉外层的列表
         
-        # 将最新的预测结果展示到界面上
-        for i, value in enumerate(latest_prediction):
-            formatted_value = f"{value:.2f}"  # 保留两位小数
-            data_labels[f'data{i+1}'].config(text=formatted_value)
-        
+        # 检查 predictions 列表是否为空
+        if predictions:
+            # 获取最新的预测结果
+            print(predictions)
+            latest_prediction = predictions[-1][0][0]  # 获取最后一个预测结果，并去掉外层的列表
+            
+            # 将最新的预测结果展示到界面上
+            for i, value in enumerate(latest_prediction):
+                formatted_value = f"{value:.2f}"  # 保留两位小数
+                data_labels[f'data{i+1}'].config(text=formatted_value)
+        else:
+            for label in data_labels.values():
+                label.config(text="N/A")
     else:
         for label in data_labels.values():
             label.config(text="N/A")
