@@ -13,9 +13,11 @@ def mse(y_true, y_pred):
 
 # 加载保存的模型
 model = keras.models.load_model('model.h5', custom_objects={'mse': mse})
+model_r = keras.models.load_model('model_reactive.h5', custom_objects={'mse': mse})
 
 # 读取 CSV 文件
 df = pd.read_csv('data/customer_power_data.csv', parse_dates=['timestamp'])
+df_r = pd.read_csv('data/customer_reactive_power_data.csv', parse_dates=['timestamp'])
 
 # 提取年、月、日信息
 df['year'] = df['timestamp'].dt.year
@@ -155,6 +157,10 @@ for data_item, (x, y) in data_positions.items():
     label.place(x=x, y=y)
     data_labels[data_item] = label
 
+# 添加一个新的 Label 用于显示总和
+sum_label = tk.Label(data_frame, text="", bg="white")
+sum_label.place(x=26, y=100)
+
 # 定义递归预测函数
 def recursive_predict(model, input_data, steps):
     predictions = []
@@ -191,6 +197,7 @@ def update_data_display():
         # Handle invalid date
         for label in data_labels.values():
             label.config(text="N/A")
+        sum_label.config(text="N/A")
         return
     
     # 获取 df 中的最后一条记录的 timestamp
@@ -199,10 +206,17 @@ def update_data_display():
     # 查找对应时间的数据
     if selected_time in df['timestamp'].values:
         row = df[df['timestamp'] == selected_time]
+        row_r = df_r[df_r['timestamp'] == selected_time]
+        total_sum = 0  # 初始化总和
+        total_sum_r = 0  # 初始化无功功率总和
         for i, column in enumerate(df.columns[1:32]):  # 只取前31列数据
             value = row[column].values[0]
-            formatted_value = f"{value:.2f}"  # 保留两位小数
+            value_r = row_r[column].values[0]
+            formatted_value = f"{value:.2f}\n{value_r:.2f}"  # 保留两位小数，并在第二行显示 df_r 的数值
             data_labels[f'data{i+1}'].config(text=formatted_value)
+            total_sum += value  # 累加每个居民的用电量
+            total_sum_r += value_r  # 累加每个居民的无功功率
+        sum_label.config(text=f"{total_sum:.2f}\n{total_sum_r:.2f}")  # 更新总和显示
     elif selected_time > last_timestamp:
         # 获取最新的输入数据
         latest_data = df.iloc[-48:, 1:32].values.astype(np.float32)  # 获取最后48行数据，去掉时间戳列，并转换为 float32
@@ -225,7 +239,6 @@ def update_data_display():
         # 检查 predictions 列表是否为空
         if predictions:
             # 获取最新的预测结果
-            print(predictions)
             latest_prediction = predictions[-1][0][0]  # 获取最后一个预测结果，并去掉外层的列表
             
             # 将最新的预测结果展示到界面上
@@ -238,6 +251,7 @@ def update_data_display():
     else:
         for label in data_labels.values():
             label.config(text="N/A")
+        sum_label.config(text="N/A")
 
 # 绑定更新数据显示的事件
 year_combobox.bind("<<ComboboxSelected>>", lambda e: update_data_display())
