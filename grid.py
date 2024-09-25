@@ -171,7 +171,7 @@ def update_time_display():
     time_display.set(f"{hour:02d}:{minute:02d}")
     update_data_display()
 
-# 更新数据显示的函数
+# Update data display
 def update_data_display():
     year = int(year_var.get())
     month = int(month_var.get())
@@ -188,29 +188,29 @@ def update_data_display():
         sum_label.config(text="N/A")
         return
     
-    # 获取 df 中的最后一条记录的 timestamp
+    # Load last timestamp from training data
     last_timestamp = df['timestamp'].max()
     
-    # 查找对应时间的数据
+    # Find data corresponding to the selected time
     if selected_time in df['timestamp'].values:
         row = df[df['timestamp'] == selected_time]
         row_r = df_r[df_r['timestamp'] == selected_time]
-        total_sum = 0  # 初始化总和
-        total_sum_r = 0  # 初始化无功功率总和
-        for i, column in enumerate(df.columns[1:32]):  # 只取前31列数据
+        total_sum = 0
+        total_sum_r = 0
+        for i, column in enumerate(df.columns[1:32]):
             value = row[column].values[0]
             value_r = row_r[column].values[0]
-            formatted_value = f"P: {value:.2f}\nQ: {value_r:.2f}"  # 保留两位小数，并在第二行显示 df_r 的数值
+            formatted_value = f"P: {value:.2f}\nQ: {value_r:.2f}" 
             data_labels[f'data{i+1}'].config(text=formatted_value)
-            total_sum += value  # 累加每个居民的用电量
-            total_sum_r += value_r  # 累加每个居民的无功功率
-        sum_label.config(text=f"P: {total_sum:.2f}\nQ: {total_sum_r:.2f}")  # 更新总和显示
+            total_sum += value
+            total_sum_r += value_r
+        sum_label.config(text=f"P: {total_sum:.2f}\nQ: {total_sum_r:.2f}")
     elif selected_time > last_timestamp:
-        # 获取最新的输入数据
-        latest_data = df.iloc[-48:, 1:32].values.astype(np.float32)  # 获取最后48行数据，去掉时间戳列，并转换为 float32
-        latest_data_r = df_r.iloc[-48:, 1:32].values.astype(np.float32)  # 获取最后48行数据，去掉时间戳列，并转换为 float32
+        # Get the latest data
+        latest_data = df.iloc[-48:, 1:32].values.astype(np.float32)
+        latest_data_r = df_r.iloc[-48:, 1:32].values.astype(np.float32)
         
-        # 如果数据不足48行，用零填充
+        # Use zero padding if the latest data is less than 48 time steps
         if latest_data.shape[0] < 48:
             padding = np.zeros((48 - latest_data.shape[0], latest_data.shape[1]), dtype=np.float32)
             latest_data = np.vstack((padding, latest_data))
@@ -218,33 +218,33 @@ def update_data_display():
             padding_r = np.zeros((48 - latest_data_r.shape[0], latest_data_r.shape[1]), dtype=np.float32)
             latest_data_r = np.vstack((padding_r, latest_data_r))
         
-        # 构建输入数据，形状为 (1, 48, 31)
+        # Build input data structure to (1, 48, 31)
         input_data = np.expand_dims(latest_data, axis=0)
         input_data_r = np.expand_dims(latest_data_r, axis=0)
 
-        # 计算时间步数
+        # Compute time steps between the last timestamp and the selected time
         time_diff = selected_time - last_timestamp
-        steps = int(time_diff.total_seconds() // 1800)  # 每30分钟一个时间步
+        steps = int(time_diff.total_seconds() // 1800)  # 1 step / 30 minutes
         
-        # 预测未来的时间步数据
+        # Predict future values
         predictions = recursive_predict(model, input_data, steps)
         predictions_r = recursive_predict(model_r, input_data_r, steps)
         
-        # 检查 predictions 列表是否为空
+        # Ensure predictions are available
         if predictions and predictions_r:
-            # 获取最新的预测结果
-            latest_prediction = predictions[-1][0][0]  # 获取最后一个预测结果，并去掉外层的列表
+            # Get the latest prediction
+            latest_prediction = predictions[-1][0][0]
             latest_prediction_r = predictions_r[-1][0][0]
             total_sum = 0
             total_sum_r = 0
             
-            # 将最新的预测结果展示到界面上
+            # Display the latest prediction
             for i, (value, value_r) in enumerate(zip(latest_prediction, latest_prediction_r)):
-                formatted_value = f"P: {value:.2f}\nQ: {value_r:.2f}"  # 保留两位小数，并在第二行显示 df_r 的数值
+                formatted_value = f"P: {value:.2f}\nQ: {value_r:.2f}"
                 data_labels[f'data{i+1}'].config(text=formatted_value)
-                total_sum += value  # 累加每个居民的用电量
-                total_sum_r += value_r  # 累加每个居民的无功功率
-            sum_label.config(text=f"P: {total_sum:.2f}\nQ: {total_sum_r:.2f}")  # 更新总和显示
+                total_sum += value
+                total_sum_r += value_r
+            sum_label.config(text=f"P: {total_sum:.2f}\nQ: {total_sum_r:.2f}")
         else:
             for label in data_labels.values():
                 label.config(text="N/A")
@@ -254,13 +254,13 @@ def update_data_display():
             label.config(text="N/A")
         sum_label.config(text="N/A")
 
-# 绑定更新数据显示的事件
+# Bind events to comboboxes
 year_combobox.bind("<<ComboboxSelected>>", lambda e: update_data_display())
 month_combobox.bind("<<ComboboxSelected>>", lambda e: update_data_display())
 day_combobox.bind("<<ComboboxSelected>>", lambda e: update_data_display())
 
-# 初始化数据展示
+# Initial data display
 update_time_display()
 
-# 运行主循环
+# Main loop
 root.mainloop()

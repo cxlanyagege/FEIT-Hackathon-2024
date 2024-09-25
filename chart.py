@@ -1,12 +1,13 @@
-import tkinter as tk
 from tkinter import ttk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
 import matplotlib.pyplot as plt
+import tkinter as tk
 
 # Create main window
 root = tk.Tk()
 root.title("Consumer")
-root.geometry("800x1200")  # Adjust window size
+root.geometry("800x1200")
 root.resizable(False, False)
 root.attributes("-toolwindow", True)
 
