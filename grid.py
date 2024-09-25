@@ -1,72 +1,68 @@
-import tkinter as tk
 from tkinter import ttk
-from PIL import Image, ImageTk  # 引入 Pillow 库
+from PIL import Image, ImageTk
+from datetime import datetime
+
+import tkinter as tk
 import pandas as pd
 import numpy as np
 import keras
-from datetime import datetime
 
-# 定义并注册自定义函数
+# Register custom mse function
 @keras.saving.register_keras_serializable()
 def mse(y_true, y_pred):
     return keras.losses.mean_squared_error(y_true, y_pred)
 
-# 加载保存的模型
+# Load the model
 model = keras.models.load_model('model.h5', custom_objects={'mse': mse})
 model_r = keras.models.load_model('model_reactive.h5', custom_objects={'mse': mse})
 
-# 读取 CSV 文件
+# Read CSV files
 df = pd.read_csv('data/customer_power_data.csv', parse_dates=['timestamp'])
 df_r = pd.read_csv('data/customer_reactive_power_data.csv', parse_dates=['timestamp'])
 
-# 提取年、月、日信息
+# Extract year, month, and day from timestamp
 df['year'] = df['timestamp'].dt.year
 df['month'] = df['timestamp'].dt.month
 df['day'] = df['timestamp'].dt.day
 
-# 获取唯一的年、月、日列表
+# Generate a list of years, months, and days
 years = sorted(df['year'].unique())
 current_year = datetime.now().year
 years = list(range(min(years), current_year + 1))
-
 months = list(range(1, 13))
 days = list(range(1, 32))
 
-# 创建主窗口
+# Main window
 root = tk.Tk()
-root.title("时间选择器")
-
-# 设置窗口大小（可选）
-root.geometry("800x600")  # 根据需要调整窗口大小
-
-# 禁用窗口调整大小和最大化
+root.title("Investor")
+root.geometry("800x600")
 root.resizable(False, False)
 root.attributes("-toolwindow", True)
 
-# 创建年份选择框
+# Create year combobox
 year_var = tk.StringVar(value=str([0]))
-ttk.Label(root, text="年:").grid(row=0, column=0, padx=5, pady=5)
+ttk.Label(root, text="Year:").grid(row=0, column=0, padx=5, pady=5)
 year_combobox = ttk.Combobox(root, textvariable=year_var, values=[str(year) for year in years])
 year_combobox.grid(row=0, column=1, padx=5, pady=5)
-year_combobox.current(0)  # 默认选择最老的年份
+year_combobox.current(0)
 
-# 创建月份选择框
+# Create month combobox
 month_var = tk.StringVar(value="1")
-ttk.Label(root, text="月:").grid(row=0, column=2, padx=5, pady=5)
+ttk.Label(root, text="Month:").grid(row=0, column=2, padx=5, pady=5)
 month_combobox = ttk.Combobox(root, textvariable=month_var, values=[str(month) for month in months])
 month_combobox.grid(row=0, column=3, padx=5, pady=5)
-month_combobox.current(0)  # 默认选择1月
+month_combobox.current(0)
 
-# 创建日期选择框
+# Create day combobox
 day_var = tk.StringVar(value="1")
-ttk.Label(root, text="日:").grid(row=0, column=4, padx=5, pady=5)
+ttk.Label(root, text="Day:").grid(row=0, column=4, padx=5, pady=5)
 day_combobox = ttk.Combobox(root, textvariable=day_var, values=[str(day) for day in days])
 day_combobox.grid(row=0, column=5, padx=5, pady=5)
-day_combobox.current(0)  # 默认选择1日
+day_combobox.current(0)
 
-# 创建时间滑动条（0到48，每单位代表30分钟）
-time_var = tk.IntVar(value=0)  # 使用整数变量
-ttk.Label(root, text="时间:").grid(row=1, column=0, padx=5, pady=5)
+# Create time slider
+time_var = tk.IntVar(value=0)
+ttk.Label(root, text="Time:").grid(row=1, column=0, padx=5, pady=5)
 time_slider = ttk.Scale(root, from_=0, to=47, orient='horizontal', variable=time_var, command=lambda v: update_time_display())
 time_slider.grid(row=1, column=1, columnspan=5, padx=5, pady=5, sticky="ew")
 
@@ -212,22 +208,27 @@ def update_data_display():
         for i, column in enumerate(df.columns[1:32]):  # 只取前31列数据
             value = row[column].values[0]
             value_r = row_r[column].values[0]
-            formatted_value = f"{value:.2f}\n{value_r:.2f}"  # 保留两位小数，并在第二行显示 df_r 的数值
+            formatted_value = f"P: {value:.2f}\nQ: {value_r:.2f}"  # 保留两位小数，并在第二行显示 df_r 的数值
             data_labels[f'data{i+1}'].config(text=formatted_value)
             total_sum += value  # 累加每个居民的用电量
             total_sum_r += value_r  # 累加每个居民的无功功率
-        sum_label.config(text=f"{total_sum:.2f}\n{total_sum_r:.2f}")  # 更新总和显示
+        sum_label.config(text=f"P: {total_sum:.2f}\nQ: {total_sum_r:.2f}")  # 更新总和显示
     elif selected_time > last_timestamp:
         # 获取最新的输入数据
         latest_data = df.iloc[-48:, 1:32].values.astype(np.float32)  # 获取最后48行数据，去掉时间戳列，并转换为 float32
+        latest_data_r = df_r.iloc[-48:, 1:32].values.astype(np.float32)  # 获取最后48行数据，去掉时间戳列，并转换为 float32
         
         # 如果数据不足48行，用零填充
         if latest_data.shape[0] < 48:
             padding = np.zeros((48 - latest_data.shape[0], latest_data.shape[1]), dtype=np.float32)
             latest_data = np.vstack((padding, latest_data))
+        if latest_data_r.shape[0] < 48:
+            padding_r = np.zeros((48 - latest_data_r.shape[0], latest_data_r.shape[1]), dtype=np.float32)
+            latest_data_r = np.vstack((padding_r, latest_data_r))
         
         # 构建输入数据，形状为 (1, 48, 31)
         input_data = np.expand_dims(latest_data, axis=0)
+        input_data_r = np.expand_dims(latest_data_r, axis=0)
 
         # 计算时间步数
         time_diff = selected_time - last_timestamp
@@ -235,19 +236,27 @@ def update_data_display():
         
         # 预测未来的时间步数据
         predictions = recursive_predict(model, input_data, steps)
+        predictions_r = recursive_predict(model_r, input_data_r, steps)
         
         # 检查 predictions 列表是否为空
-        if predictions:
+        if predictions and predictions_r:
             # 获取最新的预测结果
             latest_prediction = predictions[-1][0][0]  # 获取最后一个预测结果，并去掉外层的列表
+            latest_prediction_r = predictions_r[-1][0][0]
+            total_sum = 0
+            total_sum_r = 0
             
             # 将最新的预测结果展示到界面上
-            for i, value in enumerate(latest_prediction):
-                formatted_value = f"{value:.2f}"  # 保留两位小数
+            for i, (value, value_r) in enumerate(zip(latest_prediction, latest_prediction_r)):
+                formatted_value = f"P: {value:.2f}\nQ: {value_r:.2f}"  # 保留两位小数，并在第二行显示 df_r 的数值
                 data_labels[f'data{i+1}'].config(text=formatted_value)
+                total_sum += value  # 累加每个居民的用电量
+                total_sum_r += value_r  # 累加每个居民的无功功率
+            sum_label.config(text=f"P: {total_sum:.2f}\nQ: {total_sum_r:.2f}")  # 更新总和显示
         else:
             for label in data_labels.values():
                 label.config(text="N/A")
+            sum_label.config(text="N/A")
     else:
         for label in data_labels.values():
             label.config(text="N/A")
