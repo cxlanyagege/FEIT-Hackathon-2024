@@ -66,29 +66,29 @@ ttk.Label(root, text="Time:").grid(row=1, column=0, padx=5, pady=5)
 time_slider = ttk.Scale(root, from_=0, to=47, orient='horizontal', variable=time_var, command=lambda v: update_time_display())
 time_slider.grid(row=1, column=1, columnspan=5, padx=5, pady=5, sticky="ew")
 
-# 创建显示当前时间的标签
+# Create time display
 time_display = tk.StringVar()
 time_display.set("00:00")
 ttk.Label(root, textvariable=time_display).grid(row=2, column=1, columnspan=5, padx=5, pady=5)
 
-# 创建显示数据的框架
+# Create a frame to hold the data display
 data_frame = ttk.Frame(root, borderwidth=2, relief="sunken")
 data_frame.grid(row=3, columnspan=6, padx=10, pady=10, sticky="nsew")
 
-# 配置 grid 以使 data_frame 可扩展
+# Configure grid weights
 root.grid_rowconfigure(3, weight=1)
 root.grid_columnconfigure(5, weight=1)
 data_frame.grid_rowconfigure(0, weight=1)
 data_frame.grid_columnconfigure(0, weight=1)
 
-# 加载背景图并显示在 data_frame 中
+# Load visualisation background image
 try:
     original_image = Image.open('background.jpg')
     photo = ImageTk.PhotoImage(original_image)
     
-    # 创建一个标签用于显示背景图
+    # Label
     background_label = tk.Label(data_frame, image=photo)
-    background_label.image = photo  # 保持对图像的引用
+    background_label.image = photo
     background_label.place(relwidth=1, relheight=1)
     
     def resize_image(event):
@@ -97,16 +97,9 @@ try:
         resized_image = original_image.resize((new_width, new_height), Image.LANCZOS)
         photo = ImageTk.PhotoImage(resized_image)
         background_label.config(image=photo)
-        background_label.image = photo  # 保持对图像的引用
+        background_label.image = photo
 
     data_frame.bind("<Configure>", resize_image)
-    
-    # 定义鼠标点击事件处理函数
-    def on_click(event):
-        print(f"Mouse clicked at: ({event.x}, {event.y})")
-    
-    # 绑定鼠标点击事件
-    background_label.bind("<Button-1>", on_click)
     
 except Exception as e:
     print(f"Error loading background image: {e}")
