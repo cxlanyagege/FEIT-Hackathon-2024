@@ -104,7 +104,7 @@ try:
 except Exception as e:
     print(f"Error loading background image: {e}")
 
-# 定义数据项的位置（占位符）
+# Define positions for data labels
 data_positions = {
     'data1': (99, 74),
     'data2': (167, 73),
@@ -139,31 +139,30 @@ data_positions = {
     'data31': (685, 426)
 }
 
-# 创建用于显示数据的 Label 小部件
+# Create data labels for each item
 data_labels = {}
 for data_item, (x, y) in data_positions.items():
-    label = tk.Label(data_frame, text="", bg="white")  # 设置背景为白色以便于查看
+    label = tk.Label(data_frame, text="", bg="white")
     label.place(x=x, y=y)
     data_labels[data_item] = label
 
-# 添加一个新的 Label 用于显示总和
+# Create total sum label
 sum_label = tk.Label(data_frame, text="", bg="white")
 sum_label.place(x=26, y=100)
 
-# 定义递归预测函数
+# Recursive prediction function
 def recursive_predict(model, input_data, steps):
     predictions = []
     for _ in range(steps):
         prediction = model.predict(input_data)
-        prediction = np.expand_dims(prediction, axis=1)  # 将 prediction 扩展为 3 维数组
+        prediction = np.expand_dims(prediction, axis=1)
         input_data = np.append(input_data[:, 1:, :], prediction, axis=1)
-        predictions.append(prediction)  # 将预测结果添加到 predictions 列表中
+        predictions.append(prediction)
     return predictions
 
-# 更新时间显示的函数
+# Update time display
 def update_time_display():
     time_value = time_var.get()
-    # 确保 time_value 为整数
     rounded_time_value = int(round(time_value))
     if rounded_time_value != time_value:
         time_var.set(rounded_time_value)
